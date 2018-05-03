@@ -16,22 +16,22 @@ limitations under the License.
 
 package build
 
-var processorImageDockerfileTemplate = `FROM {{baseImageName}}
+var processorImageDockerfileTemplate = `FROM {{baseImage}}
 
-{{if envVarsToAdd}}
-{{range envVarsToAdd}}
-ENV {{.}}
-{{end}}
-{{end}}
-
-{{if commandsToRun}}
-{{range commandsToRun}}
-RUN {{.}}
+{{if preCopyBuildInstructions}}
+{{range preCopyBuildInstructions}}
+{{.}}
 {{end}}
 {{end}}
 
 {{range $sourcePath, $destPath := objectsToCopy}}
 COPY {{$sourcePath}} {{$destPath}}
+{{end}}
+
+{{if postCopyBuildInstructions}}
+{{range postCopyBuildInstructions}}
+{{.}}
+{{end}}
 {{end}}
 
 CMD [ "processor", "--config", "/etc/nuclio/config/processor/processor.yaml", "--platform-config", "/etc/nuclio/config/platform/platform.yaml" ]

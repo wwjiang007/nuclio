@@ -31,7 +31,7 @@ type invocationResource struct {
 }
 
 // called after initialization
-func (tr *invocationResource) OnAfterInitialize() {
+func (tr *invocationResource) OnAfterInitialize() error {
 
 	// all methods
 	for _, registrar := range []func(string, http.HandlerFunc){
@@ -44,6 +44,8 @@ func (tr *invocationResource) OnAfterInitialize() {
 	} {
 		registrar("/*", tr.handleRequest)
 	}
+
+	return nil
 }
 
 func (tr *invocationResource) handleRequest(responseWriter http.ResponseWriter, request *http.Request) {
@@ -62,12 +64,12 @@ func (tr *invocationResource) handleRequest(responseWriter http.ResponseWriter, 
 	requestBody, err := ioutil.ReadAll(request.Body)
 	if err != nil {
 		responseWriter.WriteHeader(http.StatusInternalServerError)
-		responseWriter.Write([]byte(`{"error": "Failed to read request body"}`))
+		responseWriter.Write([]byte(`{"error": "Failed to read request body"}`)) // nolint: errcheck
 		return
 	}
 
 	// resolve the function host
-	invocationResult, err := tr.getPlatform().InvokeFunction(&platform.InvokeOptions{
+	invocationResult, err := tr.getPlatform().CreateFunctionInvocation(&platform.CreateFunctionInvocationOptions{
 		Name:      functionName,
 		Namespace: functionNamespace,
 		Path:      path,
@@ -81,7 +83,7 @@ func (tr *invocationResource) handleRequest(responseWriter http.ResponseWriter, 
 		tr.Logger.WarnWith("Failed to invoke function", "err", err)
 
 		responseWriter.WriteHeader(http.StatusInternalServerError)
-		responseWriter.Write([]byte(`{"error": "Failed to invoke function"}`))
+		responseWriter.Write([]byte(`{"error": "Failed to invoke function"}`)) // nolint: errcheck
 		return
 	}
 
@@ -91,7 +93,7 @@ func (tr *invocationResource) handleRequest(responseWriter http.ResponseWriter, 
 	}
 
 	responseWriter.WriteHeader(invocationResult.StatusCode)
-	responseWriter.Write(invocationResult.Body)
+	responseWriter.Write(invocationResult.Body) // nolint: errcheck
 }
 
 // register the resource

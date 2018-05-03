@@ -1,3 +1,19 @@
+/*
+Copyright 2017 The Nuclio Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package cron
 
 import (
@@ -5,6 +21,7 @@ import (
 
 	"github.com/nuclio/nuclio/pkg/common"
 	"github.com/nuclio/nuclio/pkg/errors"
+	"github.com/nuclio/nuclio/pkg/functionconfig"
 	"github.com/nuclio/nuclio/pkg/processor/trigger"
 	"github.com/nuclio/nuclio/pkg/processor/worker"
 
@@ -20,7 +37,6 @@ const (
 type cron struct {
 	trigger.AbstractTrigger
 	configuration *Configuration
-	baseEvent     Event
 	tickMethod    int
 	schedule      cronlib.Schedule
 	stop          chan int
@@ -35,7 +51,7 @@ func newTrigger(logger logger.Logger,
 			ID:              configuration.ID,
 			Logger:          logger,
 			WorkerAllocator: workerAllocator,
-			Class:           "sync",
+			Class:           "async",
 			Kind:            "cron",
 		},
 		configuration: configuration,
@@ -74,17 +90,15 @@ func newTrigger(logger logger.Logger,
 		return nil, errors.New("Cron trigger configuration must contain either interval or schedule")
 	}
 
-	newTrigger.baseEvent = configuration.Event
-
 	return &newTrigger, nil
 }
 
-func (c *cron) Start(checkpoint trigger.Checkpoint) error {
+func (c *cron) Start(checkpoint functionconfig.Checkpoint) error {
 	go c.handleEvents()
 	return nil
 }
 
-func (c *cron) Stop(force bool) (trigger.Checkpoint, error) {
+func (c *cron) Stop(force bool) (functionconfig.Checkpoint, error) {
 	close(c.stop)
 
 	return nil, nil
@@ -104,7 +118,7 @@ func (c *cron) handleEvents() {
 			c.Logger.Info("Cron trigger stop signal received")
 			stop = true
 		default:
-			c.waitAndSubmitNextEvent(lastRunTime, c.schedule, c.handleTick)
+			c.waitAndSubmitNextEvent(lastRunTime, c.schedule, c.handleTick) // nolint: errcheck
 
 			lastRunTime = time.Now()
 		}
@@ -166,8 +180,8 @@ func (c *cron) getMissedTicks(schedule cronlib.Schedule, nextEventSubmitTime tim
 }
 
 func (c *cron) handleTick() {
-	c.AllocateWorkerAndSubmitEvent(
-		&c.baseEvent,
+	c.AllocateWorkerAndSubmitEvent( // nolint: errcheck
+		&c.configuration.Event,
 		c.Logger,
 		10*time.Second)
 }

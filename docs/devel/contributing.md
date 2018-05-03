@@ -1,4 +1,5 @@
-# How to contribute to nuclio
+# How to Contribute to nuclio
+
 This guide will guide you through the process of setting up a development environment and contributing to nuclio. 
 
 ## Set up some prerequisites
@@ -26,7 +27,7 @@ cd $GOPATH/src/github.com/nuclio/nuclio && git checkout development
 Now `go get` some dependencies that are injected into functions and cannot be vendored:
 
 ```sh
-go get github.com/nuclio/nuclio-sdk-go github.com/nuclio/logger pack.ag/amqp github.com/v3io/v3io-go-http
+go get github.com/v3io/v3io-go-http/... && go get github.com/nuclio/logger/... && go get github.com/nuclio/nuclio-sdk-go/... && go get github.com/nuclio/amqp/...
 ```
 
 Build nuclio artifacts (nuctl, docker images):

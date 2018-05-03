@@ -65,6 +65,7 @@ if __name__ == '__main__':
     for image_url in [
         'nuclio/controller',
         'nuclio/playground',
+        'nuclio/dashboard',
         'nuclio/processor-py2.7-alpine',
         'nuclio/processor-py2.7-jessie',
         'nuclio/processor-py3.6-alpine',
@@ -73,6 +74,11 @@ if __name__ == '__main__':
         'nuclio/processor-pypy2-5.9-jessie',
         'nuclio/handler-pypy2-5.9-jessie',
         'nuclio/processor-shell-alpine',
+        'nuclio/handler-nodejs-alpine',
+        'nuclio/handler-builder-java-onbuild',
+        'nuclio/handler-java',
+        'nuclio/user-builder-java-onbuild',
+        'nuclio/handler-builder-dotnetcore-onbuild'
     ]:
         if name_matcher.search(image_url):
             _push_image('{0}:{1}'.format(image_url, tag))

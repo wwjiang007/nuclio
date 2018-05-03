@@ -28,7 +28,9 @@ import (
 
 	"github.com/nuclio/nuclio/pkg/common"
 	"github.com/nuclio/nuclio/pkg/errors"
+	"github.com/nuclio/nuclio/pkg/functionconfig"
 	"github.com/nuclio/nuclio/pkg/processor/runtime"
+	"github.com/nuclio/nuclio/pkg/processor/status"
 
 	"github.com/nuclio/logger"
 	"github.com/nuclio/nuclio-sdk-go"
@@ -36,19 +38,17 @@ import (
 
 type shell struct {
 	*runtime.AbstractRuntime
-	configuration                *runtime.Configuration
-	command                      string
-	env                          []string
-	ctx                          context.Context
-	configurationResponseHeaders map[string]interface{}
+	configuration *Configuration
+	command       string
+	env           []string
+	ctx           context.Context
 }
 
-func NewRuntime(parentLogger logger.Logger, configuration *runtime.Configuration) (runtime.Runtime, error) {
-
+func NewRuntime(parentLogger logger.Logger, configuration *Configuration) (runtime.Runtime, error) {
 	runtimeLogger := parentLogger.GetChild("shell")
 
 	// create base
-	abstractRuntime, err := runtime.NewAbstractRuntime(runtimeLogger, configuration)
+	abstractRuntime, err := runtime.NewAbstractRuntime(runtimeLogger, configuration.Configuration)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create abstract runtime")
 	}
@@ -61,13 +61,14 @@ func NewRuntime(parentLogger logger.Logger, configuration *runtime.Configuration
 	}
 
 	// update it with some stuff so that we don't have to do this each invocation
-	newShellRuntime.command = newShellRuntime.getCommand()
+	newShellRuntime.command, err = newShellRuntime.getCommand()
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to get command")
+	}
+
 	newShellRuntime.env = newShellRuntime.getEnvFromConfiguration()
 
-	newShellRuntime.configurationResponseHeaders, err = newShellRuntime.getResponseHeadersFromConfiguration()
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to get response headers from function spec")
-	}
+	newShellRuntime.SetStatus(status.Ready)
 
 	return newShellRuntime, nil
 }
@@ -109,15 +110,23 @@ func (s *shell) ProcessEvent(event nuclio.Event, functionLogger logger.Logger) (
 
 	return nuclio.Response{
 		StatusCode: http.StatusOK,
-		Headers:    s.configurationResponseHeaders,
+		Headers:    s.configuration.ResponseHeaders,
 		Body:       out,
 	}, nil
 }
 
-func (s *shell) getCommand() string {
+func (s *shell) getCommand() (string, error) {
 	var command string
-	handler := s.configuration.Spec.Handler
-	moduleName := strings.Split(handler, ":")[0]
+
+	moduleName, entrypoint, err := functionconfig.ParseHandler(s.configuration.Spec.Handler)
+	if err != nil {
+		return "", errors.Wrap(err, "Failed to parse handler")
+	}
+
+	// if there's only one segment in the handler, in shell's case, it's the module name
+	if moduleName == "" {
+		moduleName = entrypoint
+	}
 
 	// if there's a directory passed as an environment telling us where to look for the module, use it. otherwise
 	// use /opt/nuclio
@@ -132,7 +141,9 @@ func (s *shell) getCommand() string {
 	if common.FileExists(shellHandlerPath) {
 
 		// set permissions of handler such that if it wasn't executable before, it's executable now
-		os.Chmod(shellHandlerPath, 0755)
+		if err := os.Chmod(shellHandlerPath, 0755); err != nil {
+			return "", errors.Wrapf(err, "Failed to change mode for %s", shellHandlerPath)
+		}
 
 		command = shellHandlerPath
 	} else {
@@ -141,38 +152,15 @@ func (s *shell) getCommand() string {
 		command = moduleName
 	}
 
-	return command
+	return command, nil
 }
 
 func (s *shell) getCommandArguments(event nuclio.Event) string {
-
 	if arguments := event.GetHeaderString("x-nuclio-arguments"); arguments != "" {
 		return arguments
 	}
 
-	// append arguments, if any
-	if arguments, argumentsExists := s.configuration.Spec.RuntimeAttributes["arguments"]; argumentsExists {
-		return arguments.(string)
-	}
-
-	return ""
-}
-
-func (s *shell) getResponseHeadersFromConfiguration() (map[string]interface{}, error) {
-	if responseHeaders, responseHeadersExists := s.configuration.Spec.RuntimeAttributes["responseHeaders"]; responseHeadersExists {
-		s.Logger.DebugWith("Found headers in function spec that will be added to all responses",
-			"headers", responseHeaders)
-
-		responseHeadersMap, ok := responseHeaders.(map[string]interface{})
-		if !ok {
-			return nil, errors.Errorf("Failed to parse response headers from function spec. Received: %v", responseHeaders)
-		}
-
-		return responseHeadersMap, nil
-	}
-
-	s.Logger.Debug("No extra response headers from configuration found")
-	return make(map[string]interface{}), nil
+	return s.configuration.Arguments
 }
 
 func (s *shell) getEnvFromConfiguration() []string {

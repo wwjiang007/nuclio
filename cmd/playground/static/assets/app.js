@@ -301,22 +301,38 @@ $(function () {
         var template = vManipulator.getTemplate();
         $container.html(
             '<ul id="' + id + '-pair-list" class="pair-list"></ul>' +
-            '<div id="' + id + '-add-new-pair-form" class="add-new-pair-form space-between">' +
-            '<div class="new-key"><input type="text" class="text-input new-key" id="' + id + '-new-key" placeholder="Type ' + headers.key + '..."></div>' +
-            '<div class="new-value">' + (_.isString(template) ? template : '') + '</div>' +
-            '<button class="pair-action add-pair-button button green" title="Add" id="' + id + '-add-new-pair">+</button>' +
+            '<div class="new-pair-actions">' +
+            '    <button class="new-pair-button pair-action button green" title="Add a new pair..." id="' + id + '-show-add-new-pair">+</button>' +
+            '</div>' +
+            '<div id="' + id + '-add-new-pair-form" class="add-new-pair-form">' +
+            '    <div class="space-between">' +
+            '        <div class="new-key"><input type="text" class="text-input new-key" id="' + id + '-new-key" placeholder="Type ' + headers.key + '..."></div>' +
+            '        <div class="new-value">' + (_.isString(template) ? template : '') + '</div>' +
+            '    </div>' +
+            '    <div class="new-pair-actions">' +
+            '        <button class="pair-action add-pair-apply-button button blue" title="Apply" id="' + id + '-add-new-pair-apply">&checkmark;</button>' +
+            '        <button class="pair-action add-pair-cancel-button button grey" title="Cancel" id="' + id + '-add-new-pair-cancel">&times;</button>' +
+            '    </div>' +
             '</div>'
         );
 
         var $pairList = $('#' + id + '-pair-list');
+        var $newPairForm = $('#' + id + '-add-new-pair-form');
         var $newKeyInput = $('#' + id + '-new-key');
         var $newValueInput = $container.find('.new-value');
-        var $newPairButton = $('#' + id + '-add-new-pair');
-        $newPairButton.click(addNewPair);
+        var $showAddPairButton = $('#' + id + '-show-add-new-pair');
+        var $newPairApplyButton = $('#' + id + '-add-new-pair-apply');
+        var $newPairCancelButton = $('#' + id + '-add-new-pair-cancel');
+
+        $showAddPairButton.click(showAddNewPair);
+        $newPairCancelButton.click(hideAddNewPairForm);
+        $newPairApplyButton.click(addNewPair);
 
         if (template instanceof jQuery) {
             template.appendTo($newValueInput);
         }
+
+        $newPairForm.hide(0);
 
         redraw(); // draw for the first time
 
@@ -393,10 +409,35 @@ $(function () {
 
         /**
          * Clears "Key" and "Value" input fields and set focus to "Key" input field - for next input
+         *
+         * @private
          */
         function clearInput() {
             vManipulator.clearValue();
             $newKeyInput.val('').get(0).focus();
+        }
+
+        /**
+         * Shows the add new pair form (and hides the "+" button) and puts focus on the new key text box
+         *
+         * @private
+         */
+        function showAddNewPair() {
+            $showAddPairButton.hide(0);
+            $newPairForm.show(0);
+            $newKeyInput.get(0).focus();
+        }
+
+        /**
+         * Clears and hides the "add new pair" form and put focus on the "add new pair" button
+         *
+         * @private
+         */
+        function hideAddNewPairForm() {
+            clearInput();
+            $newPairForm.hide(0);
+            $showAddPairButton.show(0);
+            $showAddPairButton.get(0).focus();
         }
 
         /**
@@ -433,7 +474,7 @@ $(function () {
                 redraw();
 
                 // clear input and make ready for input of next key-value pair
-                clearInput();
+                hideAddNewPairForm();
             }
         }
 
@@ -467,11 +508,11 @@ $(function () {
 
             // otherwise - build HTML for list of key-value pairs, plus add headers
             else {
-                $pairList.append('<li class="space-between">' + _(pairs).map(function (value, key) {
+                $pairList.append('<li class="pair-list-item space-between">' + _(pairs).map(function (value, key) {
                     return '<span class="pair-key text-ellipsis" title="' + key + '">' + key + '</span>' +
                         '<span class="pair-value text-ellipsis" title="' + vManipulator.parseValue(value) + '">' +
                         vManipulator.parseValue(value) + '</span>';
-                }).join('</li><li class="space-between">') + '</li>');
+                }).join('</li><li class="pair-list-item space-between">') + '</li>');
 
                 var $listItems = $pairList.find('li'); // all list items
 
@@ -898,7 +939,7 @@ $(function () {
                             : _.range(start, end + 1);
                     })
                     .flatten() // make a single flat array (e.g. `[1, [2, 3], 4, [5, 6]]` to `[1, 2, 3, 4, 5, 6]`)
-                    .compact() // get rid of `null` values (e.g. `[null, 1, null, 2, 3, null]` to `[1, 2, 3]`)
+                    .without(false, null, '', undefined, NaN) // get rid of `null` values (e.g. `[null, 1, null, 2, 3, null]` to `[1, 2, 3]`)
                     .uniq() // get rid of duplicate values (e.g. `[1, 2, 2, 3, 4, 4, 5]` to `[1, 2, 3, 4, 5]`)
                     .sortBy() // sort the list in ascending order (e.g. `[4, 1, 5, 3, 2, 6]` to`[1, 2, 3, 4, 5, 6]`)
                     .value();
@@ -1058,6 +1099,10 @@ $(function () {
 
     // Maps between runtime and the corresponding file extension and display label
     var runtimeConf = {
+        'dotnetcore': {
+            extension: 'cs',
+            label: '.NET Core'
+        },
         'python:2.7': {
             extension: 'py',
             label: 'Python 2.7'
@@ -1081,7 +1126,11 @@ $(function () {
         'nodejs': {
             extension: 'js',
             label: 'NodeJS'
-        }
+        },
+	'java': {
+	    extension: 'java',
+	    label: 'Java'
+	}
     };
     var selectedFunction = null;
     var listRequest = {};
@@ -1459,7 +1508,7 @@ $(function () {
         loadSource(path)
             .done(function (responseText) {
                 var enabled              = !_.get(selectedFunction, 'spec.disable', false);
-                var httpPort             = _.get(selectedFunction, 'spec.httpPort', 0);
+                var httpPort             = _.get(selectedFunction, 'status.httpPort', 0);
                 var triggers             = _.get(selectedFunction, 'spec.triggers', {});
                 var dataBindings         = _.get(selectedFunction, 'spec.dataBindings', {});
                 var runtimeAttributes    = _.get(selectedFunction, 'spec.runtimeAttributes', {});
@@ -1628,9 +1677,6 @@ $(function () {
                 triggers: triggersInput.getKeyValuePairs()
             });
 
-            // populate conditional properties
-            populatePort();
-
             // disable "Invoke" pane, until function is successfully deployed
             disableInvokePane(true);
 
@@ -1655,25 +1701,6 @@ $(function () {
                             showErrorToast('Deploy failed... (' + jqXHR.responseText + ')');
                     }
                 });
-        }
-
-        /**
-         * Populate `spec.httpPort` if a trigger of kind `'http'` exists and have a `port` attribute
-         *
-         * @private
-         */
-        function populatePort() {
-            var httpPort = _.chain(triggersInput.getKeyValuePairs())
-                .pickBy(['kind', 'http'])
-                .values()
-                .first()
-                .get('attributes.port')
-                .value();
-
-            // if HTTP trigger was added, inject its port number to the functions `httpPort` property
-            if (_.isNumber(httpPort)) {
-                _.set(selectedFunction, 'spec.httpPort', httpPort);
-            }
         }
 
         /**
@@ -1814,7 +1841,7 @@ $(function () {
     //
 
     // Drag'n'Drop textual files into the code editor
-    var validFileExtensions = ['.py', '.pypy', '.go', '.sh', '.txt'];
+    var validFileExtensions = ['.cs', '.py', '.pypy', '.go', '.sh', '.txt'];
 
     var codeEditor = createEditor('code-editor', 'text', true, true, false, CODE_EDITOR_MARGIN);
 
@@ -1938,7 +1965,7 @@ $(function () {
      * @param {boolean} [hide=false] - `true` for hiding, otherwise showing
      */
     function hideFunctionUrl(hide) {
-        var httpPort = _.get(selectedFunction, 'spec.httpPort', 0);
+        var httpPort = _.get(selectedFunction, 'status.httpPort', 0);
         $('#input-url').html(hide ? '' : loadedUrl.get('protocol', 'hostname') + ':' + httpPort);
     }
 
@@ -2036,14 +2063,14 @@ $(function () {
                     if (shouldKeepPolling(pollResult)) {
                         pollingDelayTimeout = window.setTimeout(poll, POLLING_DELAY);
                     }
-                    else if (_.get(pollResult, 'status.state') === 'Ready') {
+                    else if (_.get(pollResult, 'status.state') === 'ready') {
                         if (selectedFunction === null) {
                             selectedFunction = {};
                         }
 
                         // store the port for newly created function
-                        var httpPort = _.get(pollResult, 'spec.httpPort', 0);
-                        _.set(selectedFunction, 'spec.httpPort', httpPort);
+                        var httpPort = _.get(pollResult, 'status.httpPort', 0);
+                        _.set(selectedFunction, 'status.httpPort', httpPort);
 
                         // enable controls of "Invoke" pane and display a message about it
                         disableInvokePane(false);
@@ -2060,7 +2087,7 @@ $(function () {
      */
     function shouldKeepPolling(pollResult) {
         var firstWord = _.get(pollResult, 'status.state', '').split(/\s+/)[0];
-        return !['Ready', 'Failed'].includes(firstWord);
+        return !['ready', 'error'].includes(firstWord);
     }
 
     //
@@ -2181,7 +2208,11 @@ $(function () {
             },
             {
                 value: 'v3ioItemPoller',
-                label: 'v3io'
+                label: 'v3io item poller'
+            },
+            {
+                value: 'v3ioStream',
+                label: 'v3io stream'
             },
             {
                 value: 'cron',
@@ -2207,7 +2238,7 @@ $(function () {
             label: 'URL',
             title: 'URL',
             placeholder: 'URL, e.g. http://12.34.56.78:9999/path',
-            kinds: ['kafka', 'nats', 'v3ioItemPoller']
+            kinds: ['kafka', 'nats', 'v3ioItemPoller', 'v3ioStream']
         },
         {
             id: 'triggers-total',
@@ -2218,7 +2249,7 @@ $(function () {
             placeholder: 'Total partitions/shards...',
             required: true,
             min: 0,
-            kinds: ['eventhub', 'kafka', 'kinesis', 'v3ioItemPoller']
+            kinds: ['eventhub', 'kafka', 'kinesis', 'v3ioItemPoller', 'v3ioStream']
         },
         {
             id: 'triggers-partitions',
@@ -2228,7 +2259,7 @@ $(function () {
             title: 'Partitions (e.g. 1,2-3,4)',
             placeholder: 'Partitions, e.g. 1,2-3,4',
             pattern: '\\s*\\d+(\\s*-\\s*\\d+)?(\\s*,\\s*\\d+(\\s*-\\s*\\d+)?)*(\\s*(,\\s*)?)?',
-            kinds: ['kafka', 'v3ioItemPoller']
+            kinds: ['kafka', 'v3ioItemPoller', 'v3ioStream', 'eventhub']
         },
         {
             id: 'triggers-topic',
@@ -2542,6 +2573,47 @@ $(function () {
             title: 'Body',
             placeholder: 'Body',
             kinds: ['cron']
+        },
+
+        // v3io stream specific
+        {
+            id: 'triggers-v3io-stream-num-container-workers',
+            path: 'attributes.numContainerWorkers',
+            type: 'number',
+            label: 'Number of container workers',
+            title: 'Number of container workers',
+            placeholder: 'Number of container workers',
+            kinds: ['v3ioStream']
+        },
+        {
+            id: 'triggers-v3io-stream-seek-to',
+            path: 'attributes.seekTo',
+            type: 'dropdown',
+            label: 'Seek to',
+            options: [
+                { value: '', label: 'Select seek to...' },
+                { value: 'earliest', label: 'Earliest' },
+                { value: 'latest', label: 'Latest' },
+            ],
+            kinds: ['v3ioStream']
+        },
+        {
+            id: 'triggers-v3io-stream-read-batch-size',
+            path: 'attributes.readBatchSize',
+            type: 'number',
+            label: 'Number of records to read from stream in a batch',
+            title: 'Number of records to read from stream in a batch',
+            placeholder: 'Number of records to read from stream in a batch',
+            kinds: ['v3ioStream']
+        },
+        {
+            id: 'triggers-v3io-stream-polling-interval-ms',
+            path: 'attributes.pollingIntervalMs',
+            type: 'number',
+            label: 'Number of milliseconds to wait between record reads',
+            title: 'Number of milliseconds to wait between record reads',
+            placeholder: 'Number of milliseconds to wait between record reads',
+            kinds: ['v3ioStream']
         }
     ];
 

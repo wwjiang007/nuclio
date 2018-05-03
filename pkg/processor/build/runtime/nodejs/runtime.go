@@ -73,14 +73,14 @@ func (n *nodejs) getFunctionHandler() string {
 	return fmt.Sprintf("%s:%s", functionFileName, "handler")
 }
 
-func (n *nodejs) GetProcessorBaseImageName() (string, error) {
+func (n *nodejs) GetProcessorBaseImage() (string, error) {
 	versionInfo, err := version.Get()
 
 	if err != nil {
 		return "", errors.Wrap(err, "Failed to get version info")
 	}
 
-	return fmt.Sprintf("nuclio/handler-nodejs:%s-%s",
+	return fmt.Sprintf("nuclio/handler-nodejs-alpine:%s-%s",
 		versionInfo.Label,
 		versionInfo.Arch), nil
 }

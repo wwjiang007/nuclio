@@ -19,6 +19,7 @@ package command
 import (
 	"encoding/json"
 	"os"
+	"time"
 
 	"github.com/nuclio/nuclio/pkg/common"
 	"github.com/nuclio/nuclio/pkg/errors"
@@ -33,12 +34,14 @@ type deployCommandeer struct {
 	cmd                      *cobra.Command
 	rootCommandeer           *RootCommandeer
 	functionConfig           functionconfig.Config
+	readinessTimeout         time.Duration
 	commands                 stringSliceFlag
 	encodedDataBindings      string
 	encodedTriggers          string
 	encodedLabels            string
 	encodedEnv               string
 	encodedRuntimeAttributes string
+	projectName              string
 }
 
 func newDeployCommandeer(rootCommandeer *RootCommandeer) *deployCommandeer {
@@ -78,6 +81,11 @@ func newDeployCommandeer(rootCommandeer *RootCommandeer) *deployCommandeer {
 			// decode labels
 			commandeer.functionConfig.Meta.Labels = common.StringToStringMap(commandeer.encodedLabels)
 
+			// if the project name was set, add it as a label
+			if commandeer.projectName != "" {
+				commandeer.functionConfig.Meta.Labels["nuclio.io/project-name"] = commandeer.projectName
+			}
+
 			// decode env
 			for envName, envValue := range common.StringToStringMap(commandeer.encodedEnv) {
 				commandeer.functionConfig.Spec.Env = append(commandeer.functionConfig.Spec.Env, v1.EnvVar{
@@ -95,17 +103,10 @@ func newDeployCommandeer(rootCommandeer *RootCommandeer) *deployCommandeer {
 				return errors.Wrap(err, "Failed to initialize root")
 			}
 
-			err := validateFunctionConfig(args,
-				rootCommandeer.platform.GetDeployRequiresRegistry(),
-				&commandeer.functionConfig)
-
-			if err != nil {
-				return err
-			}
-
-			_, err = rootCommandeer.platform.DeployFunction(&platform.DeployOptions{
-				Logger:         rootCommandeer.loggerInstance,
-				FunctionConfig: commandeer.functionConfig,
+			_, err := rootCommandeer.platform.CreateFunction(&platform.CreateFunctionOptions{
+				Logger:           rootCommandeer.loggerInstance,
+				FunctionConfig:   commandeer.functionConfig,
+				ReadinessTimeout: &commandeer.readinessTimeout,
 			})
 
 			return err
@@ -119,17 +120,6 @@ func newDeployCommandeer(rootCommandeer *RootCommandeer) *deployCommandeer {
 	return commandeer
 }
 
-func validateFunctionConfig(args []string,
-	registryRequired bool,
-	functionConfig *functionconfig.Config) error {
-
-	if functionConfig.Spec.Build.Registry == "" && registryRequired {
-		return errors.New("A registry is required; can also be specified in spec.image or via a NUCTL_REGISTRY environment variable")
-	}
-
-	return nil
-}
-
 func addDeployFlags(cmd *cobra.Command,
 	functionConfig *functionconfig.Config,
 	commandeer *deployCommandeer) {
@@ -139,14 +129,15 @@ func addDeployFlags(cmd *cobra.Command,
 	cmd.Flags().StringVarP(&commandeer.encodedLabels, "labels", "l", "", "Additional function labels (lbl1=val1[,lbl2=val2,...])")
 	cmd.Flags().StringVarP(&commandeer.encodedEnv, "env", "e", "", "Environment variables (env1=val1[,env2=val2,...])")
 	cmd.Flags().BoolVarP(&functionConfig.Spec.Disabled, "disabled", "d", false, "Start the function as disabled (don't run yet)")
-	cmd.Flags().IntVar(&functionConfig.Spec.HTTPPort, "port", 0, "Public HTTP port (NodePort)")
 	cmd.Flags().IntVarP(&functionConfig.Spec.Replicas, "replicas", "", 1, "Set to 1 to use a static number of replicas")
 	cmd.Flags().IntVar(&functionConfig.Spec.MinReplicas, "min-replicas", 0, "Minimal number of function replicas")
 	cmd.Flags().IntVar(&functionConfig.Spec.MaxReplicas, "max-replicas", 0, "Maximal number of function replicas")
 	cmd.Flags().BoolVar(&functionConfig.Spec.Publish, "publish", false, "Publish the function")
 	cmd.Flags().StringVar(&commandeer.encodedDataBindings, "data-bindings", "{}", "JSON-encoded data bindings for the function")
 	cmd.Flags().StringVar(&commandeer.encodedTriggers, "triggers", "{}", "JSON-encoded triggers for the function")
-	cmd.Flags().StringVar(&functionConfig.Spec.ImageName, "run-image", "", "Name of an existing image to deploy (default - build a new image to deploy)")
+	cmd.Flags().StringVar(&functionConfig.Spec.Image, "run-image", "", "Name of an existing image to deploy (default - build a new image to deploy)")
 	cmd.Flags().StringVar(&functionConfig.Spec.RunRegistry, "run-registry", os.Getenv("NUCTL_RUN_REGISTRY"), "URL of a registry for pulling the image, if differs from -r/--registry (env: NUCTL_RUN_REGISTRY)")
 	cmd.Flags().StringVar(&commandeer.encodedRuntimeAttributes, "runtime-attrs", "{}", "JSON-encoded runtime attributes for the function")
+	cmd.Flags().DurationVar(&commandeer.readinessTimeout, "readiness-timeout", 30*time.Second, "maximum wait time for the function to be ready")
+	cmd.Flags().StringVar(&commandeer.projectName, "project-name", "", "name of project to which this function belongs to")
 }

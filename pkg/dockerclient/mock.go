@@ -17,6 +17,8 @@ limitations under the License.
 package dockerclient
 
 import (
+	"time"
+
 	"github.com/stretchr/testify/mock"
 )
 
@@ -63,6 +65,11 @@ func (mdc *MockDockerClient) RunContainer(imageName string, runOptions *RunOptio
 	return "", nil
 }
 
+// ExecInContainer will run a command in a container
+func (mdc *MockDockerClient) ExecInContainer(containerID string, execOptions *ExecOptions) error {
+	return nil
+}
+
 // RemoveContainer removes a container given a container ID
 func (mdc *MockDockerClient) RemoveContainer(containerID string) error {
 	return nil
@@ -76,6 +83,11 @@ func (mdc *MockDockerClient) GetContainerLogs(containerID string) (string, error
 // GetContainers returns a list of container IDs which match a certain criteria
 func (mdc *MockDockerClient) GetContainers(options *GetContainerOptions) ([]Container, error) {
 	return nil, nil
+}
+
+// AwaitContainerHealth blocks until the given container is healthy or the timeout passes
+func (mdc *MockDockerClient) AwaitContainerHealth(containerID string, timeout *time.Duration) error {
+	return nil
 }
 
 // LogIn allows docker client to access secured registries
